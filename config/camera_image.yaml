@@ -1,0 +1,29 @@
+%YAML:1.0
+---
+# =====================================================================
+# 相机内参（图片用）
+# 来源：老师提供，camera_name = rune_sim_camera，重投影误差 0.0140px
+# ⚠️ 这一套只适用于 data/images 下的 960x720 图片！
+#    视频要用 config/camera_video.yaml —— 两套内参不一样，混用误差会大好几倍。
+# =====================================================================
+image_width: 960
+image_height: 720
+camera_name: "rune_sim_camera"
+
+# 内参矩阵：[fx, 0, cx; 0, fy, cy; 0, 0, 1]
+# fx/fy 焦距(像素)，cx/cy 光心(像素)。PnP 解算和真值投影都用它。
+camera_matrix: !!opencv-matrix
+  rows: 3
+  cols: 3
+  dt: d
+  data: [869.1168824543144, 0.0, 480.0,
+         0.0, 869.1168824543144, 360.0,
+         0.0, 0.0, 1.0]
+
+# 畸变系数（plumb_bob 模型）：[k1, k2, p1, p2, k3]
+# 这套仿真相机标定结果全为 0，即认为画面无畸变，直接用针孔模型。
+distortion_coefficients: !!opencv-matrix
+  rows: 1
+  cols: 5
+  dt: d
+  data: [0.0, 0.0, 0.0, 0.0, 0.0]
