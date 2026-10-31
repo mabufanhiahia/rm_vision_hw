@@ -11,7 +11,8 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 # ---- 依赖 1：OpenCV ----
-# WSL/Ubuntu 里装好 libopencv-dev 后这行就能直接找到
+# WSL/Ubuntu 里装好 libopencv-dev 后这行就能直接找到。
+# 矩阵运算全部用 cv::Mat/cv::Vec，第三周的 EKF 也没有引入 Eigen。
 find_package(OpenCV REQUIRED)
 
 # ---- 依赖 2：ONNX Runtime（神经网络方案用）----
@@ -28,16 +29,21 @@ endif()
 # ---- 目标：主程序 ----
 # 显式列出源文件（比 file(GLOB) 规范：新增文件必须手动登记，避免"改了却没编译进去"）
 # 按模块分组排列，和 include/ 下的头文件一一对应：
-#   main / pipeline_*   入口与两条流水线（图片、视频）
+#   main / pipeline_*   入口与五条流水线（图片、视频、dump、ekf、plot）
 #   detectors           两种识别方案的统一入口
 #   camera / ground_truth  数据源与真值
 #   traditional_detector / YOLO_detector / digit_classifier  识别与数字分类
 #   pose_solver         位置解算
 #   visualizer          结果展示
+#   imu_reader / frame_pose  第三周：IMU 内录数据读取与相机系→世界系转换
+#   ekf                 第三周：9 维扩展卡尔曼滤波
 add_executable(rm_vision_hw
     src/main.cpp
     src/pipeline_image.cpp
     src/pipeline_video.cpp
+    src/pipeline_dump.cpp
+    src/pipeline_ekf.cpp
+    src/pipeline_plot.cpp
     src/detectors.cpp
     src/camera.cpp
     src/ground_truth.cpp
@@ -46,6 +52,9 @@ add_executable(rm_vision_hw
     src/digit_classifier.cpp
     src/pose_solver.cpp
     src/visualizer.cpp
+    src/imu_reader.cpp
+    src/frame_pose.cpp
+    src/ekf.cpp
 )
 
 # 现代 CMake 写法：include/链接只作用于本 target，不污染全局

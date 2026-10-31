@@ -78,8 +78,8 @@ Resize / Transpose / Softmax）语义在 opset 11~13 就已定型，声明成 19
 - 输出 `1×21×6300`，每个候选 21 个数：
   `[cx, cy, w, h, kx1,ky1, kx2,ky2, kx3,ky3, kx4,ky4, cls_0..cls_8]`
 - 权重是 **FP16**：ONNX Runtime 在 CPU 上会自动插 Cast 转 fp32 再算，
-  能跑通但比 fp32 模型慢一些。代码里已经对「输出可能是 fp16」做了兼容
-  （`YOLO_detector.cpp` 里按元素类型决定用 `float` 还是 `float16_t` 读）
+  比 fp32 模型慢。代码按元素类型选择 `float` 或 `float16_t` 读取，
+  两种输出都支持（`YOLO_detector.cpp`）
 - 关键点顺序：`0=左上 1=左下 2=右下 3=右上`，
   与本项目 `ArmorDetection::image_points` 的 `左上→右上→右下→左下` 不同，
   后处理里必须重排，否则 PnP 会用错位的角点

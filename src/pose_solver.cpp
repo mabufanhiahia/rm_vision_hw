@@ -23,9 +23,8 @@ PoseResult PoseSolver::solve(const ArmorDetection& detection) {
     const std::vector<cv::Point2f> img_pts(detection.image_points.begin(),
                                            detection.image_points.end());
 
-    // 4 个共面点有两个镜像解，重投影几乎一样。solvePnP 只返回其中一个，可能拿到"背面"
-    // 那个（image1 就撞过：x 解成 −161.6 而真值 +150.8）。所以用 solvePnPGeneric
-    // 取全部解，再按物理条件挑：板面法向朝相机（R(2,2)<0）、且板在相机前方（tz>0）。
+    // 四点共面有两组镜像解，重投影几乎一样。solvePnPGeneric 取全部解，
+    // 再按物理条件挑：板面法向朝相机 R(2,2)<0，且板在相机前方 tz>0。
     std::vector<cv::Mat> rvecs, tvecs;
     const int nsol = cv::solvePnPGeneric(object_points_, img_pts, camera_matrix_, dist_coeffs_,
                                          rvecs, tvecs, false, cv::SOLVEPNP_IPPE);

@@ -9,7 +9,7 @@ class PoseSolver {
 public:
     static constexpr double kMaxReprojError = 3.0; // 重投影误差上限(px)，超过认为解算不可信
 
-    // 装甲板物理尺寸(mm)。宽度必须是两灯条中心距而非外缘宽度，改错会带来固定比例的 z 偏差。
+    // 装甲板尺寸(mm)：官方小装甲模块 135×55，取"两灯条中心距 × 灯条长度"
     static constexpr float kDefaultArmorWidthMm = 135.0f;
     static constexpr float kDefaultArmorHeightMm = 55.0f;
 

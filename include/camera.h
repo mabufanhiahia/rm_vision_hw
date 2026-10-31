@@ -4,10 +4,8 @@
 #include <string>
 
 // 数据源：内参读取、图片与视频读写。算法代码只管吃 cv::Mat，不关心来源。
-//
-// 本项目两套内参严格分开，拿错不会报错，只会安静地给出偏离很大的结果：
-//   config/camera_image.yaml  图片 960×720，畸变全 0
-//   config/camera_video.yaml  视频 1440×1080，带畸变
+// 两套内参不能混用：config/camera_image.yaml 是图片 960×720 无畸变，
+// camera_video.yaml 是视频 1440×1080 带畸变
 
 struct CameraIntrinsics {
     cv::Mat camera_matrix; // 3×3 内参，CV_64F

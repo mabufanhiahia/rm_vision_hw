@@ -58,9 +58,8 @@ cv::Mat buildRedMask(const cv::Mat& frame, double min_dom_g, double min_dom_b, d
     return mask;
 }
 
-// 过曝补光掩膜。灯条被打到全白时颜色判据在整根上都失效，但过曝是逐通道依次饱和的：
-// 红方 R 先满、然后 G、最后 B，所以过曝区总是"主通道饱和 + 另一通道滞后"，白色物体 R-B≈0 过不了。
-// 没有这一刀时同一块板会一会儿只剩一根灯条，框就跟着一闪一闪。
+// 过曝补光掩膜。灯条全白时颜色判据失效，但过曝是逐通道依次饱和：主通道先满、另一通道滞后，
+// 白色物体两通道同时满，据此区分。
 cv::Mat buildOverexposedMask(const cv::Mat& frame, double min_sat, double min_lag, double min_mid) {
     std::vector<cv::Mat> bgr;
     cv::split(frame, bgr);
@@ -277,9 +276,8 @@ std::vector<ArmorDetection> TraditionalDetector::detect(const cv::Mat& frame,
         armor.method = "traditional";
         armor.digit = -1; // 数字由检测器集合接数字网络补上
 
-        // 四角取灯条真实上下端点，保留灯条自身倾斜。比外推端正矩形更准：
-        // image1 上端正矩形重投影 0.016px 但三维误差 371mm，端点法重投影 1.243px 误差 269mm，
-        // 因为人为构造的完美矩形 PnP 必然拟合得好，误差被藏起来了。
+        // 四角取灯条真实上下端点，保留倾斜。不用外推的端正矩形：
+        // 完美矩形 PnP 必然拟合得好，重投影误差小而三维误差大。
         armor.image_points = {
             left.top,     // 左上
             right.top,    // 右上

@@ -5,6 +5,10 @@ build/
 results/
 debug/
 
+# ===== 改动前的临时备份 =====
+bak_*/
+*.old_bak
+
 # ===== 编辑器 / 系统垃圾 =====
 .vscode/
 .idea/
