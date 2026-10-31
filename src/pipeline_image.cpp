@@ -252,11 +252,9 @@ int runImage(const std::string& image_path, const std::string& gt_path,
         if (matched == 0 && solved > 0 && !gts.empty()) {
             std::cout << "[提示] 检测到了板，但与同组真值的三维距离全部超过 "
                       << static_cast<int>(kMatchMaxDistMm) << " mm。\n"
-                      << "       最常见原因：真值表的 image 列与图片文件编号错位一格\n"
-                      << "       （判定依据见 data/gt/README.md）。\n"
-                      << "       默认用的是重排后的表，可以换原表对比一次：\n"
-                      << "         ./build/rm_vision_hw image " << image_path
-                      << " data/gt/ground_truth.csv\n\n";
+                      << "       最常见原因：用了未修正的原始真值表（image 列整体错位一格）。\n"
+                      << "       默认读的是修正后的 data/gt/ground_truth.csv，\n"
+                      << "       若这里指定的是 ground_truth_original.csv 就会全部匹配不上，换回来即可。\n";
         }
 
         // 画标注图

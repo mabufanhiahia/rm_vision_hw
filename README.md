@@ -1,31 +1,42 @@
-# rm_vision_hw —— 27 赛季算法组视觉侧第二周作业
+# rm_vision_hw —— 27 赛季算法组视觉侧第二、三周作业
 
-传统视觉 + 神经网络**双方案**的装甲板识别与 PnP 位置解算（C++ / OpenCV / ONNX Runtime）。
+传统视觉 + 神经网络**双方案**的装甲板识别、PnP 位置解算与 EKF 整车状态估计
+（C++ / OpenCV / ONNX Runtime）。
 
 两套方案产出同一种数据结构 `ArmorDetection`，所以下游的位置解算、误差比对、
-结果展示完全不需要知道这一帧是哪套算法检出来的。
+结果展示完全不需要知道这一帧是哪套算法检出来的。第三周在其上接了一条链路：
+PnP 位姿按曝光时刻配 IMU 姿态转到世界系，送进 9 维 EKF 估计车中心、速度、朝向、角速度。
 
 ---
 
 ## 1. 快速开始
 
-⚠️ **必须在项目根目录 `rm_vision_hw/` 下执行**，代码里的默认路径都是相对它的。
+**必须在项目根目录 `rm_vision_hw/` 下执行**，代码里的默认路径都是相对它的。
 
 ```bash
 # ---- 构建（配置只需首次或改了 CMakeLists 后执行一次）----
 cmake -S . -B build
 cmake --build build -j
 
-# ---- 作业④：图片模式（检测 → PnP 解算 → 与真值比对）----
+# ---- 图片模式：检测 → PnP 解算 → 与真值比对 ----
 ./build/rm_vision_hw image                 # 处理 data/images/ 下全部图片（默认 + 传统方案）
 ./build/rm_vision_hw image data/images/image2.jpg   # 只处理这一张
-./build/rm_vision_hw image data/images data/gt/ground_truth_reordered.csv
+./build/rm_vision_hw image data/images data/gt/ground_truth.csv   # 显式指定真值表
 ./build/rm_vision_hw image data/images/image1.jpg data/gt/ground_truth.csv \
                            config/camera_image.yaml both   # 两种方案都跑
 
-# ---- 作业③：视频模式（逐帧检测 → 画框+数字 → 输出标注视频）----
+# ---- 视频模式：逐帧检测 → 画框+数字 → 输出标注视频 ----
 ./build/rm_vision_hw video data/videos/armor_record.avi traditional
 ./build/rm_vision_hw video data/videos/armor_record.avi nn
+
+# ---- 第三周：EKF 整车状态估计 ----
+./build/rm_vision_hw dump    # 标定相机-IMU 外参，导出每帧位姿到 results/frame_poses.csv
+./build/rm_vision_hw ekf     # 逐帧滤波，输出 results/ekf_states.csv 与 ekf_video.mp4
+./build/rm_vision_hw plot    # 状态序列画成 results/ekf_curves.png
+
+# ekf 模式会弹两个窗口（画面 + 俯视轨迹，空格暂停、q 退出）。WSLg 的图形栈偶尔会
+# 让窗口白板甚至卡住关不掉，这时跳过窗口系统，改看落盘的图：
+RV_NOWIN=1 ./build/rm_vision_hw ekf
 
 # ---- 忘了参数？直接跑它会打印用法 ----
 ./build/rm_vision_hw
@@ -36,6 +47,9 @@ cmake --build build -j
 ```
 rm_vision_hw image [图片或图片目录] [真值csv] [内参yaml] [方案]
 rm_vision_hw video [视频] [方案] [输出路径(可选)]
+rm_vision_hw dump  [视频] [imu txt] [内参yaml] [方案] [输出csv] [外参编号(可选)]
+rm_vision_hw ekf   [视频] [imu txt] [内参yaml] [方案] [输出视频] [输出csv]
+rm_vision_hw plot  [状态csv] [输出png]
 ```
 
 第二个参数给**目录**时会批量处理目录里所有 `.jpg/.png/.bmp`，每张图各打印一张误差表；
@@ -47,7 +61,9 @@ rm_vision_hw video [视频] [方案] [输出路径(可选)]
 | 真值csv | `data/gt/ground_truth.csv` |
 | 内参yaml | `config/camera_image.yaml` |
 | 视频 | `data/videos/armor_record.avi` |
+| imu txt | `data/imu/imu_record.txt`（第三周） |
 | 方案 | `traditional` |
+| 第三周内参 | dump / ekf 模式默认 `config/camera_video.yaml` |
 
 **方案取值**：`traditional`（传统视觉）/ `nn`（神经网络）/ `both`（两种都跑）。
 图片模式下 `both` 会打印两张误差表；视频模式下 `both` 会输出两个视频文件。
@@ -61,6 +77,11 @@ rm_vision_hw video [视频] [方案] [输出路径(可选)]
 | `results/detect_<图片名>_<方案>.jpg` | 图片标注图：绿框（传统）/ 青框（神经网络）= 检测结果，红色十字 = 真值投影位置 |
 | `results/video_<方案>.avi` | 视频标注结果（画框 + 数字/兵种 + 左上角帧号与耗时） |
 | `results/debug_mask.jpg` | 传统方案的蓝色优势分割掩膜，调阈值时看它最直观 |
+| `results/frame_poses.csv` | 第三周 dump 模式：每帧每块板的相机系与世界系位姿 |
+| `results/ekf_states.csv` | 第三周 ekf 模式：9 个状态量 + 9 个 σ + 每帧 NIS |
+| `results/ekf_video.mp4` | 四块板重投影 + 右上角实时状态面板 |
+| `results/ekf_curves.png` | 9 个状态量曲线，带 ±1σ 不确定度带 |
+| `results/frames/` | 每 30 帧一张当前帧 `frame_XXXX.jpg` 与俯视图 `topview_XXXX.png`，不依赖窗口 |
 
 ---
 
@@ -79,21 +100,26 @@ rm_vision_hw/
 │   ├── detectors.h             # 两种方案的统一入口（含"结合数字网络配对"）
 │   ├── pose_solver.h           # 【位置解算】PnP
 │   ├── visualizer.h            # 【结果展示】画框 / 真值点 / 信息条
-│   └── pipeline.h              # 两条流水线：图片模式、视频模式
+│   ├── imu_reader.h            # 【第三周】IMU 内录读取：时间戳 + 四元数
+│   ├── frame_pose.h            # 【第三周】装甲板几何常量、外参候选、相机系→世界系
+│   ├── ekf.h                   # 【第三周】9 维扩展卡尔曼滤波
+│   └── pipeline.h              # 五条流水线：image / video / dump / ekf / plot
 ├── src/                        # 与上面一一对应的实现文件
 ├── config/
 │   ├── camera_image.yaml       # 图片用内参（960×720，畸变全 0）
-│   └── camera_video.yaml       # 视频用内参（1440×1080，带畸变）⚠️ 两套不能混用
+│   └── camera_video.yaml       # 视频用内参（1440×1080，带畸变）  两套不能混用
 ├── data/
 │   ├── gt/ground_truth.csv     # 三张图的装甲板位置真值（相机系，米）
 │   ├── images/                 # image1/2/3.jpg（960×720）
+│   ├── imu/imu_record.txt      # 【第三周】IMU 内录，531 行（时间戳 w x y z）
 │   └── videos/armor_record.avi
 ├── models/                     # ONNX 模型（见 models/README.md 的下载命令）
 └── results/                    # 运行输出（gitignore，不入库）
 ```
 
-模块的划分依据是作业第 5 条：**识别**、**数字分类**、**位置解算**、**结果展示**
-各自独立成一个头/源对，`main.cpp` 只负责解析命令行和分发，一共 50 行左右。
+模块按职责划分：**识别**、**数字分类**、**位置解算**、**结果展示**各自独立成头/源对，
+第三周的 IMU 读取、坐标系转换、滤波、绘图同样各自成对，只依赖解算输出、不反向依赖。
+`main.cpp` 只负责解析命令行和分发。
 
 ---
 
@@ -124,12 +150,12 @@ cmake -S . -B build -DONNXRUNTIME_ROOT=/你的/onnxruntime路径
 | `data/images/` 图片 | `config/camera_image.yaml` | 960×720 | 全 0（仿真相机 rune_sim_camera） |
 | `data/videos/armor_record.avi` | `config/camera_video.yaml` | 1440×1080 | 有（标定值，重投影误差 0.1448px） |
 
-群里已确认"图像的内参和视频的内参不一样"。混用会让误差大好几倍，
-而且**程序不会报错**，只是安静地给你一个差好几倍的数，非常难查。
+图片和视频是两套内参。混用会让误差大好几倍，而且**程序不会报错**，
+只会安静地输出一个错得离谱的数。
 
-⚠️ 视频内参还有个待确认点：cx×2≈1358、cy×2≈1058，与视频实际分辨率 1440×1080
-不完全吻合。作业③只要求画框+数字、不做解算，所以不影响视频流程；
-但将来要在视频上做 PnP 之前，必须先与学长确认标定分辨率。
+视频内参的主点是 (679.2, 529.1)，即成像中心对应 1358×1058，与素材的 1440×1080 不同。
+这个差值只改变光轴位置，不改变尺度：第三周用这套内参在视频上做 PnP，解出的装甲板
+半径为 0.207 m，与官方 /tf 真值的 0.2088 m 相差 1.5 mm，焦距可以直接使用。
 
 ---
 
@@ -149,19 +175,20 @@ image1,1,front,0.285747,0.070019,1.384573
 > 按图像就近会配到 armor_3，但其三维误差 333mm、armor_2 只有 105mm —— 配错了。
 > 根源是深度歧义：只要 (x/z, y/z) 比值接近，投影位置就接近，而 z 可以差很多。
 
-### ⚠️ 图片与真值编号疑似整体错位（待学长确认）
+### 图片与真值编号的错位（已修正）
 
 三路独立证据（灯条位置最近邻打分、PnP 解算坐标最近邻、以及"每组恰好用上一次"的完整性）
-都指向同一个结论 —— 原 `ground_truth.csv` 的 image 列与实物图片编号**整体错位了一格**：
+都指向同一个结论 —— 材料给的原始表 image 列与实物图片编号**整体错位了一格**：
 
-| 图片 | 应使用的真值组 | 证据 |
-|---|---|---|
-| image1.jpg | 图2.md（csv 里的 image2 组） | 3 根灯条平均只差 5.2px；解算 z=4.42m 与 armor_3(4.06m) 最接近 |
-| image2.jpg | 图3.md（csv 里的 image3 组） | 解算三维误差 54.75mm（vs 图1.md 的 142mm） |
-| image3.jpg | 图1.md（csv 里的 image1 组） | 解算三维误差 104.56mm（vs 图3.md 的 245.6mm） |
+| 图片 | 原始表同组真值的 z | 实测解算 z | 判断 |
+|---|---|---|---|
+| image1.jpg | 1.28 ~ 1.39 m | **4.32 m** | 差 3 倍，原始表不可能对 |
+| image2.jpg | 3.76 ~ 4.09 m | **1.42 m** | 差 2.7 倍，原始表不可能对 |
+| image3.jpg | 1.47 ~ 1.55 m | **1.22 m** | 差 20%，由前两组互证确定 |
 
-重排后的文件已放在 `data/gt/ground_truth_reordered.csv`，
-**经学长确认**后覆盖 `ground_truth.csv` 即可。在确认之前，误差表里的数值不可信。
+`data/gt/ground_truth.csv` 已经是修正后的表（程序默认读它）；
+材料原件存为 `data/gt/ground_truth_original.csv`，用来对照看错位的影响。
+完整证据见 `data/gt/README.md`。
 
 ---
 
@@ -178,19 +205,23 @@ image1,1,front,0.285747,0.070019,1.384573
 宽 135mm = 两灯条**中心距**，高 55mm = 灯条长度
 ```
 
-⚠️ 这两个值必须和检测器给出的角点定义配套：
-本项目的 `image_points` 用的是**两根灯条的真实上下端点**，
-所以 135mm 应理解为**两灯条中心距**，而不是装甲板外缘宽度。
-如果作业材料里 135 指的是板外缘，两者要一起改，否则 z 会有固定比例的系统偏差。
+这两个值必须和检测器给出的角点定义配套。数值取自官方《机器人制作规范手册》的小装甲
+模块 135×55：本项目 `image_points` 用的是两根灯条的真实上下端点，所以 135mm 取
+两灯条中心距、55mm 取灯条长度，与开源项目的通行口径一致。
+
+按实测反推，本素材的等效中心距为 143~145 mm，比规格值 135 mm 大 6%，这是深度方向
+系统偏差的主要来源。代码保留官方规格 135 mm，不用实测值反调。
 
 ---
 
-## 7. 待确认问题
+## 7. 已知差异
 
-1. 视频内参对应的标定分辨率（见第 4 节）
-2. **图片与真值编号的对应关系**（见第 5 节，疑似整体错位一格）
-3. 装甲板 135/55 的准确定义（见第 6 节）
-4. `models/armor.onnx` / `models/digit.onnx` 还是 0 字节占位，需按 `models/README.md` 下载
+`visible` 标记的是装甲板有没有被车体遮挡，能检出几块取决于灯条的颜色分割结果，
+两者不是同一个条件。修正后 image1 正面可见的是 armor_3、armor_4 两块，实际检出 1 块。
+程序按三维距离匹配真值编号，检出数量少于标记数量不影响误差统计。
+
+图片与真值编号的错位见第 5 节，装甲板 135×55 的定义见第 6 节，两项均按实测证据与
+官方规格确定。
 
 ---
 
